@@ -1,4 +1,4 @@
-let scene, camera, cloudParticles = [];
+let scene, camera, cloudParticles = [], composer;
 
 function init() {
     scene = new THREE.Scene();
@@ -28,7 +28,7 @@ function init() {
     renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
 
-    scene.fog = new THREE.FogExp2(0x03544e, 0.001);
+    scene.fog = new THREE.FogExp2('#4b0076', 0.001);
     renderer.setClearColor(scene.fog.color);
     document.body.appendChild(renderer.domElement);
 
@@ -40,7 +40,7 @@ function init() {
             transparent: true
         });
 
-        for(let p = 0; p < 50; p++) {
+        for(let p = 0; p < 40; p++) {
             let cloud = new THREE.Mesh(cloudGeo, cloudMaterial);
             cloud.position.set(
                 Math.random() * 800-400,
@@ -55,16 +55,48 @@ function init() {
             cloudParticles.push(cloud);
             scene.add(cloud);
         }
-    })
+    });
 
-    render();
+    loader.load('universe.webp', function(texture) {
+        const textureEffect = new POSTPROCESSING.TextureEffect({
+            blendFunction: POSTPROCESSING.BlendFunction.COLOR_DODGE,
+            texture: texture
+        });
+        textureEffect.blendMode.opacity.value = 0.2;
+
+        const bloomEffect = new POSTPROCESSING.BloomEffect({
+            blendFunction: POSTPROCESSING.BlendFunction.COLOR_DODGE,
+            kernelSize: POSTPROCESSING.KernelSize.SMALL,
+            useLuminanceFilter: true,
+            luminanceThreshold: 0.3,
+            luminanceSmoothing: 0.75
+        });
+        bloomEffect.blendMode.opacity.value = 1.5;
+    
+        let effectPass = new POSTPROCESSING.EffectPass(camera, bloomEffect, textureEffect);
+        effectPass.renderToScreen = true;
+    
+        composer = new POSTPROCESSING.EffectComposer(renderer);
+        composer.addPass(new POSTPROCESSING.RenderPass(scene, camera));
+        composer.addPass(effectPass);
+
+        window.addEventListener('resize', onWindowResize, false)
+    
+        render();
+    });
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
 function render() {
     cloudParticles.forEach(p => {
         p.rotation.z -= 0.001;
     });
-    renderer.render(scene, camera);
+    composer.render(0.1);
     requestAnimationFrame(render);
 }
 
